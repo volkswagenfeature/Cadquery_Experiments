@@ -61,21 +61,6 @@ def outline(width,height,depth,groove,angle,parent=cq):
 
 
 
-
-
-
-#Parent in this case is the workplane that you're building off of
-def stripefill(thickness,spacing,angle,parent,max_d=None,norm=None,offset=cq.Vector(0,0,0)):
-    max_d = parent.largestDimension() if max_d is None else max_d
-    norm = parent.findFace().normalAt() if norm is None else norm
-    log(norm)
-    reps = math.ceil(max_d /(thickness + spacing)) + 2
-    r = parent.center(-max_d/2,-max_d/2)
-    
-    for _ in range(reps):
-        r = r.rect(max_d,spacing,False).center(0,thickness+spacing)
-    return r.extrude(max_d).rotateAboutCenter(norm,angle).translate(offset)
-
 ######## Packaged Class #############
 
 class v_block:
@@ -112,14 +97,23 @@ class v_block:
         return o
     
     def stripefill(self,thickness,spacing,angle,parent,max_d=None,norm=None,offset=cq.Vector(0,0,0)):
-        max_d = parent.largestDimension() if max_d is None else max_d
-        norm = parent.findFace().normalAt() if norm is None else norm
+        norm = self.p_vector
+        max_d = self.max_d
         log(norm)
         reps = math.ceil(max_d /(thickness + spacing)) + 2
-        r = parent.center(-max_d/2,-max_d/2)
+        front_face = self.outline.faces(cq.DirectionMinMaxSelector(self.p_vector)).findFace()
+        log(type(front_face))
+        
+        # TODO: rotation vector has to be changed from (90,0,0) to something which acomidates
+        # real pointing of block, rather than just nominal pointing.
+        r = cq.Workplane(front_face,front_face.Center()).transformed((90,0,0))
+        r = r.center(-max_d/2,-max_d/2)
+        
         
         for _ in range(reps):
             r = r.rect(max_d,spacing,False).center(0,thickness+spacing)
+        
+                
         final = r.extrude(max_d).rotateAboutCenter(norm,angle).translate(offset)
         return final
     
@@ -128,7 +122,7 @@ class v_block:
     def gen_stripes(self):
         s = self.stripefill(self.stripe_params.thickness,
                        self.stripe_params.spacing,
-                       0,#self.stripe_params.s_angle,
+                       self.stripe_params.s_angle,
                        self.parent,
                        self.max_d,
                        cq.Vector(1,1,0),#self.p_vector,
@@ -200,6 +194,5 @@ class v_block:
 #test = o2d-s + o2d.faces(">Y or <Y").shell(shell_thick,'intersection')
 
 
-s = v_block(parent=cq.Workplane("XY"))
-test1 = s.gen_stripes()
-test2 = s.draw()
+s = v_block()
+block = s.draw()
