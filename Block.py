@@ -3,67 +3,16 @@ import math
 from collections import namedtuple
 # dimensions in mm
 
-#External dimensions
-block_width = 20
-block_height = 20
-block_depth = 20
-
-groove_depth = 5
-groove_angle = 90
-
-#fill dimensions
-shell_thick = 2
-Rib_thick = 1
-Rib_space = 2
-
-#first order aproximation of s/cos(x/2) . 
-#Guarenteed to be larger in range (-179,179) exclusive.
-#Why did I write this instead of just importing a normal cosine?
-#The world may never know. 
-badacos = lambda x: (10200)/(8100-(x/2)**2)
-
-
-    
-    
-    #Fill is defined later, as it may be varied
-    
-def outline_2d(width,height,depth,groove,angle,parent=cq.Workplane("XZ")):
-    Outline = (
-                parent
-                .rect(width,height)
-                .extrude(depth)
-                .workplane()
-                .moveTo(0,height/2-groove)
-                .polarLine(groove*badacos(angle),90-angle/2)
-                .hLineTo(0)
-                .mirrorY()
-                .cutThruAll()
-                )
-    return Outline
-
-
-def outline(width,height,depth,groove,angle,parent=cq):
-
-    
-    Outline =(
-                parent
-                .box(width,height,depth)
-                .faces(">Y")
-                .workplane()
-                .moveTo(0,height/2-groove)
-                .polarLine(groove*badacos(angle),90-angle/2)
-                .hLineTo(0)
-                .mirrorY()
-                .cutThruAll()
-            )
-
-    return Outline
-
-
 
 ######## Packaged Class #############
 
 class v_block:
+    #first order aproximation of s/cos(x/2) . 
+    #Guarenteed to be larger in range (-179,179) exclusive.
+    #Why did I write this instead of just importing a normal cosine?
+    #The world may never know. 
+    badacos = staticmethod(lambda x: (10200)/(8100-(x/2)**2))
+    
     _outline_params_proto = namedtuple('outline','width height groove g_angle',
                                        defaults=[20,20,5,90])
     _stripe_params_proto  = namedtuple('stripe' ,'thickness spacing s_angle',
@@ -86,8 +35,22 @@ class v_block:
 
     
     def calc_alignment(self) -> cq.Vector:
+        #TODO: Finish this!
         return cq.Vector(0,0,0)
     def gen_outline(self):
+        def outline(width,height,depth,groove,angle,parent=cq):
+            Outline =(
+                        parent
+                        .box(width,height,depth)
+                        .faces(">Y")
+                        .workplane()
+                        .moveTo(0,height/2-groove)
+                        .polarLine(groove*self.badacos(angle),90-angle/2)
+                        .hLineTo(0)
+                        .mirrorY()
+                        .cutThruAll()
+                    )
+            return Outline
         o = outline(self.outline_params.width,
                     self.outline_params.height,
                     self.additional_params.depth,
@@ -180,7 +143,7 @@ class v_block:
         
         #Assigning stripes object and shell object
         self.stripes = self.gen_stripes()
-        self.shell = self.outline.faces(">Y or <Y").shell(self.additional_params.shell_thick,'intersection')
+        self.shell = self.outline.faces(">Y or <Y").shell(-self.additional_params.shell_thick,'intersection')
         
         
     def draw(self):
@@ -192,7 +155,6 @@ class v_block:
 #st = stripefill(Rib_thick,Rib_space,groove_angle/2,cq.Workplane("XZ"),35,cq.Vector(0,1,0))
 
 #test = o2d-s + o2d.faces(">Y or <Y").shell(shell_thick,'intersection')
-
-
-s = v_block()
-block = s.draw()
+if __name__ == "temp":
+    s = v_block(shell_thick=2)
+    block = s.draw()
