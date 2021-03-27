@@ -1,6 +1,7 @@
 import cadquery as cq
 import math
 from collections import namedtuple
+from typing import Tuple
 # dimensions in mm
 
 
@@ -26,6 +27,10 @@ class v_block:
     additional_params=None #Of type additional
     max_d = None
     
+    # The reference point that is used to spin the infill pattern. 
+    # defined in init
+    Pivot = None
+    
     #Further stuff computationaly assigned
     parent = None # Parent workplane
     p_vector = None # Perpendicular vector
@@ -34,50 +39,53 @@ class v_block:
     #When class is finalized, will move actual functions into place
 
     
-    def calc_alignment(self) -> cq.Vector:
+    def calc_alignment(self) -> Tuple[cq.Vector,cq.Vector]:
         #TODO: Finish this!
-        return cq.Vector(0,0,0)
+        return cq.Vector(0,0,0),cq.Vector(0,0,0)
     def gen_outline(self):
-        def outline(width,height,depth,groove,angle,parent=cq):
-            Outline =(
-                        parent
-                        .box(width,height,depth)
-                        .faces(">Y")
-                        .workplane()
-                        .moveTo(0,height/2-groove)
-                        .polarLine(groove*self.badacos(angle),90-angle/2)
-                        .hLineTo(0)
-                        .mirrorY()
-                        .cutThruAll()
-                    )
-            return Outline
-        o = outline(self.outline_params.width,
-                    self.outline_params.height,
-                    self.additional_params.depth,
-                    self.outline_params.groove,
-                    self.outline_params.g_angle,
-                    self.parent)
+        o = (
+                self.parent
+                .box(self.outline_params.width, 
+                     self.outline_params.height, 
+                     self.additional_params.depth)
+                .faces(">Y")
+                .workplane()
+                .moveTo(0,self.outline_params.height/2
+                         -self.outline_params.groove)
+                .polarLine(self.outline_params.groove*self.badacos(self.outline_params.g_angle),
+                           90 - self.outline_params.g_angle/2)
+                .hLineTo(0)
+                .mirrorY()
+                .cutThruAll()
+            )
+        #o = outline(self.outline_params.width,
+        #            self.outline_params.height,
+        #            self.additional_params.depth,
+        #            self.outline_params.groove,
+        #            self.outline_params.g_angle,
+        #            self.parent)
         return o
     
-    def stripefill(self,thickness,spacing,angle,parent,max_d=None,norm=None,offset=cq.Vector(0,0,0)):
-        norm = self.p_vector
-        max_d = self.max_d
-        log(norm)
-        reps = math.ceil(max_d /(thickness + spacing)) + 2
+    def stripefill(self):#,thickness,spacing,angle,parent,max_d=None,norm=None,offset=cq.Vector(0,0,0)):
+        thickness = self.stripe_params.thickness
+        spacing = self.stripe_params.spacing
+        reps = math.ceil(self.max_d /(thickness + spacing)) + 2
         front_face = self.outline.faces(cq.DirectionMinMaxSelector(self.p_vector)).findFace()
         log(type(front_face))
         
         # TODO: rotation vector has to be changed from (90,0,0) to something which acomidates
         # real pointing of block, rather than just nominal pointing.
         r = cq.Workplane(front_face,front_face.Center()).transformed((90,0,0))
-        r = r.center(-max_d/2,-max_d/2)
+        r = r.center(-self.max_d/2,-self.max_d/2)
         
         
         for _ in range(reps):
-            r = r.rect(max_d,spacing,False).center(0,thickness+spacing)
+            r = r.rect(self.max_d,spacing,False).center(0,thickness+spacing)
         
                 
-        final = r.extrude(max_d).rotateAboutCenter(norm,angle).translate(offset)
+        final = (r.extrude(self.max_d)
+                  .rotateAboutCenter(self.p_vector,self.stripe_params.s_angle)
+                )
         return final
     
     
@@ -139,10 +147,12 @@ class v_block:
 
         # Generating outline. Pre-requisite for further generation.
         self.outline = self.gen_outline()
+        
+        # Generating other vital data
         self.max_d = self.outline.largestDimension()
         
         #Assigning stripes object and shell object
-        self.stripes = self.gen_stripes()
+        self.stripes = self.stripefill()
         self.shell = self.outline.faces(">Y or <Y").shell(-self.additional_params.shell_thick,'intersection')
         
         
