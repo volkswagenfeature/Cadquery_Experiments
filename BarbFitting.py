@@ -83,11 +83,33 @@ class simpletriangle (thread):
         return cq.Wire.assembleEdges([l1,l2])
 
 def build_disc(thread_model:thread,radius:int,pitch:int,taper = 0):
+    norm = cq.Vector(0,1,1).normalized()
     if taper:
         raise ValueError("Taper is not yet supported")
+    # Generate a transformation from where the thread object is defined
+    # (which is always the plane along the x axis, towards positive Y)
+    # To the provided normal axis.
+    rot = OCP.gp.gp_Quaternion(OCP.gp.gp_Vec(1,0,0),norm.wrapped)
     
-    d = cq.Wire.makeCircle(radius,cq.Vector(0,0,0),cq.Vector(0,0,1))
-    return d
+    # TODO:
+    # How do I get the thread profile oriented along the axis?
+    # I have a quarterion, how do I apply it to the cq.Wire object or the OCP.TopoDS.TopoDS_Wire
+    # Leads:
+    # The TopoDS_Shape is the parent for DS_Wire.
+    # - See Orientation	(	const TopAbs_Orientation 	Orient	)
+    # - See Move	(	const TopLoc_Location & 	position	)
+    # - See Location	(	const TopLoc_Location & 	Loc	)
+    
+    p = thread_model.draw(taper,pitch)
+    d = cq.Wire.makeCircle(radius,cq.Vector(0,0,0),norm)
+    
+    pipe = OCP.BRepOffsetAPI.BRepOffsetAPI_MakePipeShell(d.wrapped)
+    pipe.Add(p.wrapped)
+    log("READY" if pipe.IsReady() else "NOT READY")
+    pipe.Build()
+    res = cq.Shape.cast(pipe.Shape())
+    log("SDRAWTYPE:"+str(type(res)))
+    return res
 
 def buildHelix (thread_model:thread,taper,radius,pitch,height):
     if taper:
@@ -99,7 +121,7 @@ def buildHelix (thread_model:thread,taper,radius,pitch,height):
     
 
 s = simpletriangle(60)
-log(type(s.draw(0,1)))
+
 v = cq.Workplane(s.draw(0,1))
 
 # You can use CadQuery to build a path, and perform the sweep
